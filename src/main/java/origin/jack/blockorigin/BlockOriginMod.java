@@ -14,6 +14,7 @@ import origin.jack.blockorigin.internal.BackfillRunner;
 import origin.jack.blockorigin.internal.BlockOriginCommand;
 import origin.jack.blockorigin.internal.CauseAttachment;
 import origin.jack.blockorigin.internal.CauseStack;
+import origin.jack.blockorigin.internal.Config;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,6 +24,7 @@ public final class BlockOriginMod implements ModInitializer {
 
     @Override
     public void onInitialize() {
+        Config.load();
         CauseAttachment.init();
         BackfillAttachment.init();
         registerPlayerBreakHooks();
@@ -41,6 +43,7 @@ public final class BlockOriginMod implements ModInitializer {
      * decision is persisted and this prompt won't fire for that world again.
      */
     private static void maybePromptBackfill(ServerPlayerEntity player) {
+        if (!Config.get().autoPromptOnFirstLoad()) return;
         ServerWorld world = (ServerWorld) player.getEntityWorld();
         BackfillAttachment.State state = BackfillAttachment.getOrCreate(world);
         if (state.decision() != BackfillAttachment.Decision.PENDING) return;

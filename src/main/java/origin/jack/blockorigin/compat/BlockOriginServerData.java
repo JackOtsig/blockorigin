@@ -6,6 +6,7 @@ import net.minecraft.world.World;
 import origin.jack.blockorigin.BlockOriginMod;
 import origin.jack.blockorigin.api.BlockCause;
 import origin.jack.blockorigin.api.BlockOrigin;
+import origin.jack.blockorigin.internal.Config;
 import snownee.jade.api.BlockAccessor;
 import snownee.jade.api.IServerDataProvider;
 
@@ -23,6 +24,7 @@ public enum BlockOriginServerData implements IServerDataProvider<BlockAccessor> 
 
     @Override
     public void appendServerData(NbtCompound data, BlockAccessor accessor) {
+        if (!Config.get().showJadeTooltip()) return;
         World world = accessor.getLevel();
         BlockCause cause = BlockOrigin.get(world, accessor.getPosition());
         data.putString(NBT_KEY, cause.id().toString());

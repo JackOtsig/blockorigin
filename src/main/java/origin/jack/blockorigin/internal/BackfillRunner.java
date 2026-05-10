@@ -36,8 +36,6 @@ import java.util.UUID;
  */
 public final class BackfillRunner {
 
-    private static final int CHUNKS_PER_TICK = 4;
-
     private static final Map<RegistryKey<World>, Task> TASKS = new HashMap<>();
 
     private BackfillRunner() {}
@@ -116,12 +114,15 @@ public final class BackfillRunner {
         private long mismatches = 0;
         private int lastReportedTenth = -1;
 
+        private final int chunksPerTick;
+
         Task(ServerWorld world, MinecraftServer server, @Nullable UUID initiator, List<ChunkPos> chunks) {
             this.world = world;
             this.server = server;
             this.initiatorUuid = initiator;
             this.queue = new ArrayDeque<>(chunks);
             this.total = chunks.size();
+            this.chunksPerTick = Config.get().chunksPerTick();
         }
 
         public int total() { return total; }
@@ -129,7 +130,7 @@ public final class BackfillRunner {
         public boolean isDone() { return queue.isEmpty(); }
 
         void tick() {
-            for (int i = 0; i < CHUNKS_PER_TICK && !queue.isEmpty(); i++) {
+            for (int i = 0; i < chunksPerTick && !queue.isEmpty(); i++) {
                 ChunkPos pos = queue.poll();
                 processOne(pos);
                 processed++;
