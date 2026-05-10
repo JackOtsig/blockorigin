@@ -8,7 +8,8 @@
   "license": "MIT",
   "environment": "*",
   "entrypoints": {
-    "main": ["origin.jack.blockorigin.BlockOriginMod"]
+    "main": ["origin.jack.blockorigin.BlockOriginMod"],
+    "jade": ["origin.jack.blockorigin.compat.JadePlugin"]
   },
   "mixins": ["blockorigin.mixins.json"],
   "depends": {

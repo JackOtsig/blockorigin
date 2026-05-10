@@ -12,9 +12,11 @@ import origin.jack.blockorigin.internal.CauseStack;
  * Public API for reading and writing block origin data.
  *
  * <p>All methods are O(1) and allocation-free on the hot path. Reads return
- * {@link BlockCause#WORLDGEN_TERRAIN} (the implicit default) for any position
- * that has not been stamped — this includes the entire world before the mod
- * was first installed, and any unstamped chunk section after.
+ * {@link BlockCause#UNKNOWN} for any position that has not been stamped — this
+ * includes the entire world before the mod was first installed, and any
+ * unstamped chunk section after. Specific worldgen sub-causes are only set
+ * after a positive match against shadow worldgen, so {@code UNKNOWN} is the
+ * honest default rather than a false claim of worldgen.
  *
  * <p>To attribute a block change to a particular cause, push a frame onto the
  * per-thread context stack — any {@code setBlockState} that fires inside is

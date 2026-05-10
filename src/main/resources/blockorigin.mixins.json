@@ -3,6 +3,7 @@
   "package": "origin.jack.blockorigin.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
+    "ServerChunkLoadingManagerAccessor",
     "StemBlockMixin",
     "WorldChunkMixin"
   ],

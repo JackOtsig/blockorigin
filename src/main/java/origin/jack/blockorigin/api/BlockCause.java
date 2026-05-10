@@ -141,18 +141,34 @@ public enum BlockCause {
 
     private final Identifier id;
     private final Bucket bucket;
+    private final String displayName;
 
     BlockCause(String path, Bucket bucket) {
         this.id = Identifier.of(NAMESPACE, path);
         this.bucket = bucket;
+        this.displayName = computeDisplay(path);
     }
 
     public Identifier id() { return id; }
     public Bucket bucket() { return bucket; }
 
+    /** Human-readable name suitable for tooltips, e.g. {@code "Player Break"} for {@link #PLAYER_BREAK}. */
+    public String displayName() { return displayName; }
+
     /** Resolve a stable id back to a value. Returns {@code null} for unknown ids. */
     @Nullable
     public static BlockCause fromId(Identifier id) {
         return BY_ID.get(id);
+    }
+
+    private static String computeDisplay(String path) {
+        StringBuilder sb = new StringBuilder(path.length());
+        for (String word : path.split("_")) {
+            if (word.isEmpty()) continue;
+            if (!sb.isEmpty()) sb.append(' ');
+            sb.append(Character.toUpperCase(word.charAt(0)));
+            if (word.length() > 1) sb.append(word, 1, word.length());
+        }
+        return sb.toString();
     }
 }

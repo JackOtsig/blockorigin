@@ -16,7 +16,13 @@ import origin.jack.blockorigin.api.BlockCause;
  */
 public final class CauseChunkData {
 
-    public static final BlockCause IMPLICIT_DEFAULT = BlockCause.WORLDGEN_TERRAIN;
+    /**
+     * Cause returned for any position that has no recorded stamp. {@link BlockCause#UNKNOWN}
+     * is honest: the mod has no evidence of how that block came to be — it could have been
+     * worldgen, a mob action before the mod was installed, or anything else. Specific
+     * worldgen sub-causes only get stamped after a positive match against shadow worldgen.
+     */
+    public static final BlockCause IMPLICIT_DEFAULT = BlockCause.UNKNOWN;
 
     private final int bottomSectionCoord;
     private final CauseSection[] sections;
