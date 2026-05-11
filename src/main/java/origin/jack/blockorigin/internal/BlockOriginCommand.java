@@ -50,6 +50,14 @@ public final class BlockOriginCommand {
                 .then(literal("shadow")
                         .then(argument("pos", BlockPosArgumentType.blockPos())
                                 .executes(BlockOriginCommand::runShadow)))
+                .then(literal("lookup")
+                        .executes(c -> runLookup(c.getSource(), BlockPos.ofFloored(c.getSource().getPosition())))
+                        .then(literal("near")
+                                .executes(c -> runLookupNear(c.getSource(), 4))
+                                .then(argument("radius", IntegerArgumentType.integer(1, 16))
+                                        .executes(c -> runLookupNear(c.getSource(), IntegerArgumentType.getInteger(c, "radius")))))
+                        .then(argument("pos", BlockPosArgumentType.blockPos())
+                                .executes(c -> runLookup(c.getSource(), BlockPosArgumentType.getLoadedBlockPos(c, "pos")))))
                 .then(literal("backfill")
                         .executes(c -> enableAndStartBackfill(c.getSource()))
                         .then(literal("disable").executes(c -> setBackfill(c.getSource(), BackfillAttachment.Decision.DISABLED)))
@@ -166,6 +174,88 @@ public final class BlockOriginCommand {
                     "  running: %d%% (%,d/%,d chunks)",
                     pct, running.processed(), running.total())).formatted(Formatting.GRAY), false);
         }
+        return 1;
+    }
+
+    /**
+     * Scan a cube of {@code (2r+1)³} blocks around the executor and report
+     * counts of each non-{@code UNKNOWN} cause, with a sample position per
+     * cause. Useful for seeing what got stamped in an area without typing
+     * coordinates. Prints to chat and the server log.
+     */
+    private static int runLookupNear(ServerCommandSource source, int radius) {
+        ServerWorld world = source.getWorld();
+        BlockPos center = BlockPos.ofFloored(source.getPosition());
+        int minY = world.getBottomY();
+        int maxY = world.getTopYInclusive();
+
+        java.util.EnumMap<BlockCause, Counter> counts = new java.util.EnumMap<>(BlockCause.class);
+        int total = 0, unknown = 0;
+        BlockPos.Mutable mut = new BlockPos.Mutable();
+        for (int dx = -radius; dx <= radius; dx++) {
+            for (int dy = -radius; dy <= radius; dy++) {
+                for (int dz = -radius; dz <= radius; dz++) {
+                    int x = center.getX() + dx;
+                    int y = center.getY() + dy;
+                    int z = center.getZ() + dz;
+                    if (y < minY || y > maxY) continue;
+                    BlockCause c = BlockOrigin.get(world, mut.set(x, y, z));
+                    total++;
+                    if (c == BlockCause.UNKNOWN) { unknown++; continue; }
+                    Counter cnt = counts.computeIfAbsent(c, k -> new Counter());
+                    cnt.count++;
+                    if (cnt.first == null) cnt.first = mut.toImmutable();
+                }
+            }
+        }
+
+        java.util.List<java.util.Map.Entry<BlockCause, Counter>> sorted = new java.util.ArrayList<>(counts.entrySet());
+        sorted.sort((a, b) -> Integer.compare(b.getValue().count, a.getValue().count));
+
+        String header = String.format("[blockorigin] lookup near @ %s, radius %d (%d blocks, %d Unknown)",
+                center.toShortString(), radius, total, unknown);
+        source.sendFeedback(() -> Text.literal(header).formatted(Formatting.GRAY), false);
+        origin.jack.blockorigin.BlockOriginMod.LOGGER.info(header);
+
+        if (sorted.isEmpty()) {
+            source.sendFeedback(() -> Text.literal("  (no stamped causes in this area)").formatted(Formatting.DARK_GRAY), false);
+            return total;
+        }
+        for (java.util.Map.Entry<BlockCause, Counter> e : sorted) {
+            BlockCause cause = e.getKey();
+            Counter cnt = e.getValue();
+            String line = String.format("  %s: %,d  (e.g. %s)",
+                    cause.displayName(), cnt.count, cnt.first.toShortString());
+            source.sendFeedback(() -> Text.literal(line).formatted(Formatting.WHITE), false);
+            origin.jack.blockorigin.BlockOriginMod.LOGGER.info(line);
+        }
+        return total;
+    }
+
+    private static final class Counter {
+        int count = 0;
+        BlockPos first = null;
+    }
+
+    /**
+     * Quick "what's the cause here?" lookup. Works for air positions too, which
+     * Jade can't tooltip. Prints to chat AND to the server log so the answer is
+     * permanently captured in {@code latest.log}.
+     */
+    private static int runLookup(ServerCommandSource source, BlockPos pos) {
+        ServerWorld world = source.getWorld();
+        BlockState live = world.getBlockState(pos);
+        BlockCause cause = BlockOrigin.get(world, pos);
+        Identifier blockId = Registries.BLOCK.getId(live.getBlock());
+        String line = String.format("[blockorigin] lookup @ %s — block=%s, cause=%s (%s)",
+                pos.toShortString(), blockId, cause.displayName(), cause.id());
+        source.sendFeedback(() -> Text.literal("[blockorigin] lookup @ " + pos.toShortString()).formatted(Formatting.GRAY)
+                .append(Text.literal("\n  block: ").formatted(Formatting.GRAY))
+                .append(Text.literal(blockId.toString()).formatted(Formatting.WHITE))
+                .append(Text.literal("\n  cause: ").formatted(Formatting.GRAY))
+                .append(Text.literal(cause.displayName()).formatted(Formatting.WHITE))
+                .append(Text.literal(" (" + cause.id() + ")").formatted(Formatting.DARK_GRAY)), false);
+        origin.jack.blockorigin.BlockOriginMod.LOGGER.info(line);
         return 1;
     }
 

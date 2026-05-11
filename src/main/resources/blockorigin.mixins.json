@@ -3,6 +3,8 @@
   "package": "origin.jack.blockorigin.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
+    "BlockItemMixin",
+    "ExplosionImplMixin",
     "ServerChunkLoadingManagerAccessor",
     "StemBlockMixin",
     "WorldChunkMixin"
