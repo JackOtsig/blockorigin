@@ -27,6 +27,14 @@ public final class CauseChunkData {
     private final int bottomSectionCoord;
     private final CauseSection[] sections;
 
+    /**
+     * Whether the chunk has had a full shadow-worldgen diff applied. Lazy
+     * on-load scanning checks this flag and skips chunks that have already
+     * been processed. Set to {@code true} at the end of
+     * {@code ShadowGen.diffAndStamp}; persisted via the codec.
+     */
+    private boolean backfilled = false;
+
     public CauseChunkData(HeightLimitView world) {
         this(world.getBottomSectionCoord(), world.countVerticalSections());
     }
@@ -78,4 +86,7 @@ public final class CauseChunkData {
 
     public int sectionCount() { return sections.length; }
     public int bottomSectionCoord() { return bottomSectionCoord; }
+
+    public boolean isBackfilled() { return backfilled; }
+    public void setBackfilled(boolean backfilled) { this.backfilled = backfilled; }
 }

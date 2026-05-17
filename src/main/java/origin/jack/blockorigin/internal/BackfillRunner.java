@@ -113,8 +113,11 @@ public final class BackfillRunner {
         private long matches = 0;
         private long mismatches = 0;
         private int lastReportedTenth = -1;
+        private int inFlight = 0;
+        private boolean finalReported = false;
 
-        private final int chunksPerTick;
+        /** Max chunks with shadow-gen in flight on the worker pool at any time. */
+        private final int maxInFlight;
 
         Task(ServerWorld world, MinecraftServer server, @Nullable UUID initiator, List<ChunkPos> chunks) {
             this.world = world;
@@ -122,29 +125,42 @@ public final class BackfillRunner {
             this.initiatorUuid = initiator;
             this.queue = new ArrayDeque<>(chunks);
             this.total = chunks.size();
-            this.chunksPerTick = Config.get().chunksPerTick();
+            this.maxInFlight = Math.max(1, Config.get().chunksPerTick());
         }
 
         public int total() { return total; }
         public int processed() { return processed; }
-        public boolean isDone() { return queue.isEmpty(); }
+        public boolean isDone() { return queue.isEmpty() && inFlight == 0; }
 
         void tick() {
-            for (int i = 0; i < chunksPerTick && !queue.isEmpty(); i++) {
+            // Top up the worker pool with new chunks, capped at maxInFlight.
+            // Shadow gen runs on Util.getMainWorkerExecutor(); the diff + stamp
+            // pass comes back to the server thread via the future chain.
+            while (!queue.isEmpty() && inFlight < maxInFlight) {
                 ChunkPos pos = queue.poll();
-                processOne(pos);
-                processed++;
+                Chunk c = world.getChunk(pos.x, pos.z, ChunkStatus.FULL, true);
+                if (!(c instanceof WorldChunk wc)) {
+                    processed++;  // count skipped chunks too so progress reaches 100%
+                    continue;
+                }
+                inFlight++;
+                ShadowGen.diffAndStampAsync(world, wc).whenComplete((res, ex) -> {
+                    inFlight--;
+                    processed++;
+                    if (ex != null) {
+                        BlockOriginMod.LOGGER.warn("backfill: chunk {} failed: {}", pos, ex.toString());
+                    } else if (res != null) {
+                        matches += res.matches();
+                        mismatches += res.mismatches();
+                    }
+                    maybeReportProgress();
+                    if (isDone() && !finalReported) {
+                        finalReported = true;
+                        reportFinal();
+                    }
+                });
             }
             maybeReportProgress();
-            if (queue.isEmpty()) reportFinal();
-        }
-
-        private void processOne(ChunkPos pos) {
-            Chunk c = world.getChunk(pos.x, pos.z, ChunkStatus.FULL, true);
-            if (!(c instanceof WorldChunk wc)) return;
-            ShadowGen.ChunkScanResult res = ShadowGen.diffAndStamp(world, wc);
-            matches += res.matches();
-            mismatches += res.mismatches();
         }
 
         private void maybeReportProgress() {

@@ -55,10 +55,11 @@ public final class CauseCodecs {
         ).apply(i, SerializedSection::new));
     }
 
-    private record SerializedChunkData(int bottom, int count, List<SerializedSection> sections) {
+    private record SerializedChunkData(int bottom, int count, boolean backfilled, List<SerializedSection> sections) {
         static final Codec<SerializedChunkData> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.INT.fieldOf("bottom").forGetter(SerializedChunkData::bottom),
                 Codec.INT.fieldOf("count").forGetter(SerializedChunkData::count),
+                Codec.BOOL.optionalFieldOf("backfilled", false).forGetter(SerializedChunkData::backfilled),
                 SerializedSection.CODEC.listOf().fieldOf("sections").forGetter(SerializedChunkData::sections)
         ).apply(i, SerializedChunkData::new));
     }
@@ -70,6 +71,7 @@ public final class CauseCodecs {
 
     private static CauseChunkData deserialize(SerializedChunkData s) {
         CauseChunkData data = new CauseChunkData(s.bottom(), s.count());
+        data.setBackfilled(s.backfilled());
         for (SerializedSection ss : s.sections()) {
             CauseSection section = decodeSection(ss);
             if (section != null) data.installSection(ss.relIndex(), section);
@@ -97,13 +99,14 @@ public final class CauseCodecs {
 
     private static SerializedChunkData serialize(CauseChunkData data) {
         List<SerializedSection> out = new ArrayList<>();
+        boolean backfilled = data.isBackfilled();
         for (int i = 0; i < data.sectionCount(); i++) {
             CauseSection s = data.sectionAt(i);
             if (s == null) continue;
             s.tryCompact();
             out.add(encodeSection(i, s));
         }
-        return new SerializedChunkData(data.bottomSectionCoord(), data.sectionCount(), out);
+        return new SerializedChunkData(data.bottomSectionCoord(), data.sectionCount(), backfilled, out);
     }
 
     private static SerializedSection encodeSection(int relIndex, CauseSection s) {

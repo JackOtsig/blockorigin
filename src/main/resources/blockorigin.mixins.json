@@ -4,7 +4,10 @@
   "compatibilityLevel": "JAVA_21",
   "mixins": [
     "BlockItemMixin",
+    "ChunkGeneratorMixin",
     "ExplosionImplMixin",
+    "NoiseChunkGeneratorMixin",
+    "ProtoChunkMixin",
     "ServerChunkLoadingManagerAccessor",
     "StemBlockMixin",
     "WorldChunkMixin"

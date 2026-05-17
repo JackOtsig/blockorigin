@@ -14,6 +14,7 @@ import origin.jack.blockorigin.internal.BackfillRunner;
 import origin.jack.blockorigin.internal.BlockOriginCommand;
 import origin.jack.blockorigin.internal.CauseAttachment;
 import origin.jack.blockorigin.internal.CauseStack;
+import origin.jack.blockorigin.internal.ChunkLoadWatcher;
 import origin.jack.blockorigin.internal.Config;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,31 +30,44 @@ public final class BlockOriginMod implements ModInitializer {
         BackfillAttachment.init();
         registerPlayerBreakHooks();
         BackfillRunner.register();
+        ChunkLoadWatcher.register();
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) ->
                 BlockOriginCommand.register(dispatcher));
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->
-                maybePromptBackfill(handler.getPlayer()));
+                maybeAutoStartBackfill(handler.getPlayer()));
         LOGGER.info("Block Origin initialized");
     }
 
     /**
-     * Post a one-time chat prompt the first time any player joins a world that
-     * still has {@link BackfillAttachment.Decision#PENDING} as its decision.
-     * Once the user runs {@code /blockorigin backfill enable|disable}, the
-     * decision is persisted and this prompt won't fire for that world again.
+     * The first time any player joins a world that still has
+     * {@link BackfillAttachment.Decision#PENDING} as its decision, flip the
+     * decision to {@link BackfillAttachment.Decision#ENABLED} and post a chat
+     * notice. From that point on the {@code ChunkLoadWatcher} scans chunks
+     * lazily as they load — no bulk lockup at startup. For an explicit
+     * whole-world bulk pass, the player can run {@code /blockorigin backfill}.
+     *
+     * <p>Worlds set to {@link BackfillAttachment.Decision#DISABLED} are
+     * skipped. Worlds already {@code ENABLED} are skipped (the notice has
+     * been seen).
+     *
+     * <p>Gated by {@link Config.Settings#autoPromptOnFirstLoad()} — set to
+     * {@code false} to never notify or auto-enable.
      */
-    private static void maybePromptBackfill(ServerPlayerEntity player) {
+    private static void maybeAutoStartBackfill(ServerPlayerEntity player) {
         if (!Config.get().autoPromptOnFirstLoad()) return;
         ServerWorld world = (ServerWorld) player.getEntityWorld();
         BackfillAttachment.State state = BackfillAttachment.getOrCreate(world);
         if (state.decision() != BackfillAttachment.Decision.PENDING) return;
+
+        BackfillAttachment.setDecision(world, BackfillAttachment.Decision.ENABLED);
         player.sendMessage(Text.literal("[blockorigin] ").formatted(Formatting.GOLD)
-                .append(Text.literal("This world has no origin data yet.").formatted(Formatting.WHITE)), false);
-        player.sendMessage(Text.literal("  Run ").formatted(Formatting.GRAY)
+                .append(Text.literal("Enabled for this world. Chunks will be scanned as you explore.")
+                        .formatted(Formatting.WHITE)), false);
+        player.sendMessage(Text.literal("  ").formatted(Formatting.GRAY)
                 .append(Text.literal("/blockorigin backfill").formatted(Formatting.GREEN))
-                .append(Text.literal(" to scan all saved chunks against shadow worldgen and tag matches, or "))
+                .append(Text.literal(" for an explicit whole-world pass, or "))
                 .append(Text.literal("/blockorigin backfill disable").formatted(Formatting.YELLOW))
-                .append(Text.literal(" to skip.")), false);
+                .append(Text.literal(" to opt out.")), false);
     }
 
     /**

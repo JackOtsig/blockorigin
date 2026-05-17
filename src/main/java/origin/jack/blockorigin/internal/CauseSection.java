@@ -27,6 +27,15 @@ public final class CauseSection {
 
     public static final int VOLUME = 16 * 16 * 16;
 
+    /**
+     * Cache {@link BlockCause#values()} once. The JDK reallocates a fresh
+     * array on every {@code Enum.values()} call, which the inner-loop hot
+     * path (millions of {@code CauseSection.get} calls per backfill chunk)
+     * turned into massive GC pressure. Caching is the single most impactful
+     * perf fix.
+     */
+    private static final BlockCause[] CAUSES = BlockCause.values();
+
     private byte uniform;
     private byte[] dense;
 
@@ -54,7 +63,7 @@ public final class CauseSection {
 
     /** Cause when {@link #isUniform()} is true; meaningless otherwise. */
     public BlockCause uniformCause() {
-        return BlockCause.values()[uniform & 0xFF];
+        return CAUSES[uniform & 0xFF];
     }
 
     /** Direct backing array, or {@code null} if uniform. Internal use only. */
@@ -63,8 +72,8 @@ public final class CauseSection {
     }
 
     public BlockCause get(int localX, int localY, int localZ) {
-        if (dense == null) return BlockCause.values()[uniform & 0xFF];
-        return BlockCause.values()[dense[index(localX, localY, localZ)] & 0xFF];
+        if (dense == null) return CAUSES[uniform & 0xFF];
+        return CAUSES[dense[index(localX, localY, localZ)] & 0xFF];
     }
 
     public void set(int localX, int localY, int localZ, BlockCause cause) {
